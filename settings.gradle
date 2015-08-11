@@ -1,0 +1,4 @@
+include ':app'
+include ':dropboxChooserSDK'
+include ':aFileChooser'
+include ':easy_File_Encryptmaster'

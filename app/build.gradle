@@ -1,0 +1,35 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 22
+    buildToolsVersion "23.0.0 rc3"
+
+    defaultConfig {
+        applicationId "com.example.iki.dropboxcrypt"
+        minSdkVersion 15
+        targetSdkVersion 22
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    packagingOptions {
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+    }
+
+}
+dependencies {
+    compile 'com.android.support:appcompat-v7:+'
+    compile project(':aFileChooser')
+    compile project(':dropboxChooserSDK')
+    compile files('libs/dropbox-android-sdk-1.6.3.jar')
+    compile files('libs/json_simple-1.1.jar')
+    compile files('libs/commons-codec-1.7.jar')
+    compile files('libs/commons-io-2.4.jar')
+}
