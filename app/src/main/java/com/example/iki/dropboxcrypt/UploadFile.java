@@ -1,9 +1,5 @@
 package com.example.iki.dropboxcrypt;
 
-/**
- * Created by Iki on 7/29/2015.
- */
-
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -33,17 +29,13 @@ import java.io.FileNotFoundException;
  */
 public class UploadFile extends AsyncTask<Void, Long, Boolean> {
 
-
     private DropboxAPI<?> mApi;
     private String mPath;
     private File mFile;
-
-
     private long mFileLen;
     private UploadRequest mRequest;
     private Context mContext;
     private final ProgressDialog mDialog;
-
     private String mErrorMsg;
 
 

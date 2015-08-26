@@ -1,8 +1,5 @@
 package com.example.iki.dropboxcrypt;
 
-/**
- * Created by Iki on 8/10/2015.
- */
 import org.apache.commons.codec.DecoderException;
 
 import java.io.File;

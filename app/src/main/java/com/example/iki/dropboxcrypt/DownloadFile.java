@@ -1,16 +1,11 @@
 package com.example.iki.dropboxcrypt;
 
-/**
- * Created by Iki on 7/29/2015.
- */
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
-import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Environment;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.dropbox.client2.DropboxAPI;
@@ -31,8 +26,8 @@ import java.security.Key;
 import static android.widget.Toast.LENGTH_LONG;
 
 /**
- * Here we show getting metadata for a directory and downloading a file in a
- * background thread, trying to show typical exception handling and flow of
+ * Here we show getting metadata for a directory and downloading a file in the
+ * background, trying to show typical exception handling and flow of
  * control for an app that downloads a file from Dropbox.
  */
 
@@ -44,8 +39,6 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
     private DropboxAPI<?> mApi;
     private String mPath;
     private String mNameFile;
-    private ImageView mView;
-    private Drawable mDrawable;
 
     private FileOutputStream mFos;
 
@@ -56,7 +49,7 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
     private DataEncryption mEncrypter;
 
 
-    // Note that, since we use a single file name here for simplicity, you
+    // Since we use a single file name here for simplicity, we
     // won't be able to use this code for two simultaneous downloads.
     //private String DB_FILE_NAME = "";
 
@@ -67,7 +60,6 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
         mApi = api;
         mPath = dropboxPath;
         mNameFile = nameFile;
-        //mView = view;
         mpublicKey = publicKey;
 
         mDialog = new ProgressDialog(context);
@@ -100,7 +92,7 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
 
             // Get the metadata for a directory
             Entry dirent = mApi.metadata(mPath, 1000, null, true, null);
-            String path = dirent.path;
+            //String path = dirent.path;
             mFileLen = dirent.bytes;
             //mNameFile = dirent.fileName();
 
@@ -110,79 +102,33 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
                 return false;
             }
 
-            File cachePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS); //zemi SD path na telefonot
-
-            //String cachePath = Environment.getExternalStorageDirectory().getAbsolutePath(); //zemi SD path na telefonot
-
+            //get the SD path
+            File cachePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
 
             try {
+                //get the file from dropbox and decrypt it
+
                 //File file = new File(cachePath + mNameFile);
-                File file = new File(String.valueOf(cachePath)+mNameFile);
-                //showToast(file.getPath());
+                File file = new File(String.valueOf(cachePath) + mNameFile);
 
                 mFos = new FileOutputStream(file);
-                DropboxAPI.DropboxFileInfo info = mApi.getFile(mPath+mNameFile, null, mFos, null);
+                DropboxAPI.DropboxFileInfo info = mApi.getFile(mPath + mNameFile, null, mFos, null);
 
-
-                String filenameEnc = String.valueOf(cachePath)+mNameFile;
+                String filenameEnc = String.valueOf(cachePath) + mNameFile;
                 int pos = filenameEnc.lastIndexOf('.');
                 String filenameDec = filenameEnc.substring(0,pos) + "-decDB." + filenameEnc.substring(pos+1);
-                //String filenameEnc = filename.substring(0,pos) + "-enc." + filename.substring(pos+1);
                 mEncrypter = new DataEncryptionCrypto();
 
                 //set blocksize
                 int blocksize = 128;
                 mEncrypter.setBlocksize(blocksize);
-
-               // mEncrypter.encryptFile(filenameEnc, filename);
                 mEncrypter.decryptFile(filenameDec,filenameEnc);
 
 
-
-
-
-                /*
-                //Log.i("DbExampleLog", "The file's rev is: " + info.getMetadata().path);
-
-                //Log.i("DbExampleLog", "The  mFos is: " + mFos.toString());
-                Log.i("DbExampleLog", "The path file is: " + file.getPath().toString());
-                //Log.i("DbExampleLog", "The file name is: " + file.getName());
-                // Decode the encoded data with RSA public key
-
-                FileInputStream fileInputStream=null;
-                byte[] bFile = new byte[(int) file.length()];
-                try {
-                    //convert file into array of bytes
-                    fileInputStream = new FileInputStream(file);
-                    fileInputStream.read(bFile);
-                    fileInputStream.close();
-                }catch(Exception e){
-                    e.printStackTrace();
-                }
-
-                byte[] decodedBytes = null;
-                try {
-                    Cipher c = Cipher.getInstance("RSA");
-                    c.init(Cipher.DECRYPT_MODE, mpublicKey);
-                    decodedBytes = c.doFinal(bFile);
-                } catch (Exception e) {
-                    Log.e("DbExampleLog", "RSA decryption error");
-                }
-
-                try {
-                    //convert array of bytes into file
-                    FileOutputStream fileOuputStream = new FileOutputStream(file);
-                    fileOuputStream.write(decodedBytes);
-                    fileOuputStream.close();
-                }catch(Exception e){ }
-                //TextView tvdecoded = (TextView)findViewById(R.id.tvdecoded);
-                //tvdecoded.setText("[DECODED]:\n" + new String(decodedBytes) + "\n");
-*/
             } catch (FileNotFoundException e) {
                 mErrorMsg = "Couldn't create a local file to store the file";
                 //return false;
             }
-
 
             return true;
 
@@ -241,8 +187,7 @@ public class DownloadFile extends AsyncTask<Void, Long, Boolean> {
     protected void onPostExecute(Boolean result) {
         mDialog.dismiss();
         if (result) {
-            // Set the image now that we have it
-            //mView.setImageDrawable(mDrawable);
+            // Set the file now that we have it
         } else {
             // Couldn't download it, so show an error
             showToast(mErrorMsg);
