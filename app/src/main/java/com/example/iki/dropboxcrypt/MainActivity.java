@@ -1,11 +1,17 @@
 package com.example.iki.dropboxcrypt;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.hardware.fingerprint.FingerprintManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
 import android.support.v7.app.ActionBarActivity;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
@@ -25,7 +31,22 @@ import com.dropbox.client2.session.AppKeyPair;
 import com.ipaulpro.afilechooser.utils.FileUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.inject.Inject;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -46,7 +67,7 @@ public class MainActivity extends ActionBarActivity {
     ///////////////////////////////////////////////////////////////////////////
 
 
-    // You don't need to change these, needed for dropbox.
+    // Needed for dropbox
     private static final String ACCOUNT_PREFS_NAME = "prefs";
     private static final String ACCESS_KEY_NAME = "ACCESS_KEY";
     private static final String ACCESS_SECRET_NAME = "ACCESS_SECRET";
@@ -71,10 +92,26 @@ public class MainActivity extends ActionBarActivity {
     private Intent mPreferences;
     private DataEncryption mEncrypter;
 
+    // Needed fot fingerprint
+    private static final String DIALOG_FRAGMENT_TAG = "myFragment";
+    private static final String SECRET_MESSAGE = "Very secret message";
+    //alias for key in the Android key store
+    private static final String KEY_NAME = "my_key";
+    private static final int FINGERPRINT_PERMISSION_REQUEST_CODE = 50;
+
+    @Inject KeyguardManager mKeyguardManager;
+    @Inject FingerprintManager mFingerprintManager;
+    @Inject FingerprintAuthenticationDialogFragment mFragment;
+    @Inject KeyStore mKeyStore;
+    @Inject KeyGenerator mKeyGenerator;
+    @Inject Cipher mCipher;
+    @Inject SharedPreferences mSharedPreferences;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ((InjectedApplication) getApplication()).inject(this);
 
         // We create a new AuthSession so that we can use the Dropbox API.
         AndroidAuthSession session = buildSession();
@@ -106,16 +143,12 @@ public class MainActivity extends ActionBarActivity {
         mDisplay = (LinearLayout)findViewById(R.id.logged_in_display);
         mDisplayFileInformation = (LinearLayout)findViewById(R.id.file_information);
 
-        // DbxChooser
-        mChooser = new DbxChooser(APP_KEY);
 
-        // This is the button to browse into Dropbox
-        mRetrieve = (Button)findViewById(R.id.retrieve_button);
-        mRetrieve.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                mChooser.forResultType(DbxChooser.ResultType.DIRECT_LINK).launch(MainActivity.this, DBX_CHOOSER_REQUEST);
-            }
-        });
+        // fingerprint
+        // to check if a permission has not been previously granted and request it,
+        // passing in an array of permission strings and a custom int request code for keeping track of application logic flow
+        // handling retrieve button in onRequestPermissionsResult() method
+        requestPermissions(new String[]{android.Manifest.permission.USE_FINGERPRINT}, FINGERPRINT_PERMISSION_REQUEST_CODE);
 
         // button for upload
         mUpload = (Button)findViewById(R.id.upload_button);
@@ -362,6 +395,145 @@ public class MainActivity extends ActionBarActivity {
             startActivityForResult(intent, REQUEST_CODE);
         } catch (ActivityNotFoundException e) {
             // The reason for the existence of aFileChooser
+        }
+    }
+
+
+
+    // Fingerprint Authentication
+
+    //When the user is done with the dialogs, onRequestPermissionsResult is called
+    //This is where we either start our feature or handle the situation where the user has denied one or more permissions.
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] state) {
+        if (requestCode == FINGERPRINT_PERMISSION_REQUEST_CODE && state[0] == PackageManager.PERMISSION_GRANTED) {
+
+            // This is the button to browse into Dropbox
+            mRetrieve = (Button)findViewById(R.id.retrieve_button);
+
+            if (!mKeyguardManager.isKeyguardSecure()) {
+                // Show a message that the user hasn't set up a fingerprint or lock screen.
+                showToast("Secure lock screen hasn't set up.\n" + "Go to 'Settings -> Security -> Fingerprint' to set up a fingerprint");
+                return;
+            }
+            if (!mFingerprintManager.hasEnrolledFingerprints()) {
+                // Message when no fingerprints are registered.
+                showToast("Go to 'Settings -> Security -> Fingerprint' and register at least one fingerprint");
+                return;
+            }
+
+            createKey();
+
+            mRetrieve.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+
+                    // Setting up the crypto object
+                    // The object will be authenticated by use of the fingerprint
+                    if (initCipher()) {
+                        // Show the fingerprint dialog.
+                        // The user can choose between useing the fingerprint with crypto or using a server-side verified password.
+                        mFragment.setCryptoObject(new FingerprintManager.CryptoObject(mCipher));
+                        boolean useFingerprintPreference = mSharedPreferences.getBoolean(getString(R.string.use_fingerprint_to_authenticate_key), true);
+                        if (useFingerprintPreference) {
+                            mFragment.setStage(FingerprintAuthenticationDialogFragment.Stage.FINGERPRINT);
+                        } else {
+                            mFragment.setStage(FingerprintAuthenticationDialogFragment.Stage.PASSWORD);
+                        }
+                        mFragment.show(getFragmentManager(), DIALOG_FRAGMENT_TAG);
+                    } else {
+                        // This happens if the lock screen has been disabled or a fingerprint got
+                        // enrolled. Thus show the dialog to authenticate with their password first
+                        // and ask the user if they want to authenticate with fingerprints in the
+                        // future
+                        mFragment.setCryptoObject(new FingerprintManager.CryptoObject(mCipher));
+                        mFragment.setStage(FingerprintAuthenticationDialogFragment.Stage.NEW_FINGERPRINT_ENROLLED);
+                        mFragment.show(getFragmentManager(), DIALOG_FRAGMENT_TAG);
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Initialize the Cipher instance with the created key in the createKey() method
+     *
+     * return true if initialization is successful
+     * return false if the lock screen has been disabled or reset after the key was generated,
+     * or if a fingerprint got enrolled after the key was generated
+     */
+    private boolean initCipher() {
+        try {
+            mKeyStore.load(null);
+            SecretKey key = (SecretKey) mKeyStore.getKey(KEY_NAME, null);
+            mCipher.init(Cipher.ENCRYPT_MODE, key);
+            return true;
+        } catch (KeyPermanentlyInvalidatedException e) {
+            return false;
+        } catch (KeyStoreException | CertificateException | UnrecoverableKeyException | IOException
+                | NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException("Failed to init Cipher", e);
+        }
+    }
+
+
+    public void onRetrieve(boolean withFingerprint) {
+        if (withFingerprint) {
+            // If authentication happened with fingerprint, verify that using cryptography
+            tryEncrypt();
+        } else {
+            // Authentication happened with backup password
+            showConfirmation(null);
+        }
+    }
+
+
+    /**
+     * Encrypt some data with the generated key in createKey() method, which is
+     * only works if the user has just authenticated via fingerprint.
+     */
+    private void tryEncrypt() {
+        try {
+            byte[] encrypted = mCipher.doFinal(SECRET_MESSAGE.getBytes());
+            showConfirmation(encrypted);
+        } catch (BadPaddingException | IllegalBlockSizeException e) {
+            showToast("Failed to encrypt the data with the generated key. "
+                    + "Retry");
+            Log.e(TAG, "Failed to encrypt the data with the generated key." + e.getMessage());
+        }
+    }
+
+
+    // Show confirmation, if fingerprint was used go to dropbox chooser
+    private void showConfirmation(byte[] encrypted) {
+        if(encrypted != null) {
+            showToast("Fingerprint authentication successfully done");
+
+            // DbxChooser
+            mChooser = new DbxChooser(APP_KEY);
+            mChooser.forResultType(DbxChooser.ResultType.DIRECT_LINK).launch(MainActivity.this, DBX_CHOOSER_REQUEST);
+        }
+    }
+
+    public void createKey() {
+        // The enrolling flow for fingerprint. This is where we ask the user to set up fingerprint
+        // for our flow. Use of keys is necessary if we need to know if the set of
+        // enrolled fingerprints has changed.
+        try {
+            mKeyStore.load(null);
+            // Set the alias of the entry in Android KeyStore where the key will appear
+            // and the constrains in the constructor of the Builder
+            mKeyGenerator.init(new KeyGenParameterSpec.Builder(KEY_NAME,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                            // Require the user to authenticate with a fingerprint to authorize every use of the key
+                    .setUserAuthenticationRequired(true)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                    .build());
+            mKeyGenerator.generateKey();
+        } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | CertificateException | IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

@@ -3,10 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/DropBoxCrypt.iml" filepath="$PROJECT_DIR$/DropBoxCrypt.iml" />
-      <module fileurl="file://$PROJECT_DIR$/aFileChooser/aFileChooser.iml" filepath="$PROJECT_DIR$/aFileChooser/aFileChooser.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/dropboxChooserSDK/dropboxChooserSDK.iml" filepath="$PROJECT_DIR$/dropboxChooserSDK/dropboxChooserSDK.iml" />
-      <module fileurl="file://$PROJECT_DIR$/easy_File_Encryptmaster/easy_File_Encryptmaster.iml" filepath="$PROJECT_DIR$/easy_File_Encryptmaster/easy_File_Encryptmaster.iml" />
     </modules>
   </component>
 </project>

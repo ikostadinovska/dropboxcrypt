@@ -1,13 +1,13 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 22
-    buildToolsVersion "23.0.0 rc3"
+    compileSdkVersion 23
+    buildToolsVersion "23.0.0"
 
     defaultConfig {
         applicationId "com.example.iki.dropboxcrypt"
-        minSdkVersion 15
-        targetSdkVersion 22
+        minSdkVersion 23
+        targetSdkVersion 23
         versionCode 1
         versionName "1.0"
     }
@@ -32,4 +32,7 @@ dependencies {
     compile files('libs/json_simple-1.1.jar')
     compile files('libs/commons-codec-1.7.jar')
     compile files('libs/commons-io-2.4.jar')
+    compile files('libs/javax-inject.jar')
+    compile files('libs/google-collections-1.0-sources.jar')
+    compile files('libs/dagger-1.2.2.jar')
 }
